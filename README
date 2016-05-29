@@ -1,0 +1,7 @@
+This is my master degree diploma work, defended with best mark in 2015.
+In short this is flight simulator over computer generated ladnscape.
+
+In details my main focus here was to design an algorithm which can generate terrain landscapes on multiple threads.
+The flight simulator and physics behind it was just an addition to project.
+
+License GNU GPLv3
