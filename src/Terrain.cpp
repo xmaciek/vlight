@@ -1,5 +1,7 @@
 #include "Terrain.h"
 
+#include "dice.hpp"
+
 Terrain::Terrain() {
   size = 400;
   setDensity(256);
@@ -10,17 +12,24 @@ Terrain::~Terrain() {
 //   glDeleteLists(displayList, 1);
 }
 
+static uint64_t getRangeSegment( uint64_t i, uint64_t n, uint64_t maxRange )
+{
+    if ( n == i ) {
+        return maxRange;
+    }
+    return i * ( maxRange / n );
+}
+
 Terrain& Terrain::generate(const uint& seed) {
-  srand(seed);
+  m_seed = seed;
   progress = 0;
 //   phases=(n*n)*0.02;
   phases=800;
   magnitude=0.1;
+  
+  // creating default flat grid, will be distorted in threaded run
   ss = step*-0.5*n;
   double sX = ss, sY = ss;
-//   displayList = glGenLists(1);
-  
-  /*wypełnienie tablicy z punktami*/
   for (uint i=0; i<n; i++) {
     sX=ss;
     for (uint j=0; j<n; j++) {  
@@ -32,41 +41,22 @@ Terrain& Terrain::generate(const uint& seed) {
   progress += 0.01;
   
   
-  /*generowanie na watkach*/
-  phases/=numOfThreads;
-  std::cout<<"job on threads: "<<numOfThreads<<"\n";
-  std::vector<std::thread*> ths;  
-  for (uint i=0; i<numOfThreads-1; i++) { ths.push_back(new std::thread(generateStatic, this)); }
-  genThreded();
-  for (uint i=0; i<numOfThreads-1; i++) { ths[i]->join(); delete ths[i]; }
-  ths.clear();
-  
-  
-  
-  
-//   double max = step*n;
-// 
-//   /*gra w chaos*/
-//   Vertex tmp,trans;
-//   srand(seed);
-//   for (int u=0; u<3; u++) {
-//   for (int i=0; i<phases; i++) {
-//     trans[0]=randf()*max-max/2; trans[2]=randf()*max-max/2;
-//     tmp[0]=rand()%1000-500; tmp[2]=rand()%1000-500;
-//     tmp.normalize();
-//     for (int j=0; j<n*n; j++) {
-//       vertices[j]+=trans;
-//       if (Vertex(vertices[j][0],0,vertices[j][2]).normalize().angleTo(tmp)>=90) { 
-//         vertices[j][1]+=magnitude; } 
-//         else { vertices[j][1]-=magnitude;}
-//       vertices[j]-=trans;
-// //       progress += 0.3/(n*n);
-//     }
-//     
-//   }
-//   phases/=10;
-//   magnitude*=1.5;
-//   }
+    // threaded generation
+    std::cout << "number of working threads: " << numOfThreads << std::endl;
+    std::vector<std::thread*> ths;
+    for ( uint i=0; i<numOfThreads; i++ ) {
+        ths.push_back( new std::thread( generateStatic, this,
+                                        getRangeSegment( i, numOfThreads, vertices.size() ),
+                                        getRangeSegment( i + 1, numOfThreads, vertices.size() ) ) );
+    }
+    for ( uint i=0; i<numOfThreads; i++ ) {
+        ths[i]->join();
+        delete ths[i];
+    }
+    ths.clear();
+
+
+  // grid has been distorted, now creating 3d triangles based on vertices
   for (uint i=0; i<n-1; i++) {
   for (uint j=0; j<n-1; j++) {
     faces.push_back(Face(vertices[i*n+j], vertices[i*n+j+1], vertices[i*n+j+n]));
@@ -76,18 +66,12 @@ Terrain& Terrain::generate(const uint& seed) {
     progress += 0.3/(n*n);
   }
   }
-  
+
+  // estimating water level
   std::vector<double> levels;
   for (uint i=0; i<vertices.size(); i++) { levels.push_back(vertices[i][1]); }
   std::sort(levels.begin(), levels.end());
   waterLevel = (levels[0]+levels[levels.size()-1])*0.51;
-//   for (uint i=0; i<vertices.size(); i++) { if (vertices[i][1]<waterLevel) { vertices[i][1]=waterLevel; } }
-//   waterLevel = vertices[vertices.size()*0.50][1]*1.05;
-//   uint tmpi = vertices.size()*0.50;
-//   if (vertices.size()%2==1) { waterLevel = vertices[tmpi][1]*1.05; } 
-//   else { 
-//     waterLevel = (vertices[tmpi][1]+vertices[tmpi+1][1])*0.5;
-//   }
   return *this;
 }
   
@@ -346,9 +330,10 @@ Terrain& Terrain::drawMap(const double& w, const double& h) {
   return *this;
 }
 
-int Terrain::generateStatic(void* param) {
-  ((Terrain*)param)->genThreded();
-  return 0;
+int Terrain::generateStatic( void* param, uint64_t from, uint64_t to )
+{
+    static_cast<Terrain*>( param )->genThreded( from, to );
+    return 0;
 }
 
 Terrain& Terrain::setThreads(const uint& i) {
@@ -357,7 +342,7 @@ Terrain& Terrain::setThreads(const uint& i) {
 }
 
 
-void Terrain::genThreded() {
+void Terrain::genThreded( uint64_t from, uint64_t to ) {
   thread_local Vertex randAngle;
   thread_local Vertex tmp2;
   thread_local Vertex trans;
@@ -367,40 +352,25 @@ void Terrain::genThreded() {
   thread_local uint i;
   thread_local uint j;
   thread_local uint k;
+  thread_local Dice dice( m_seed );
+
   for (i=0; i<3; i++) {
   for (j=0; j<localPhases; j++) {
-    /*synchronizacja dla funkcji random()*/
-//     mtxRand.lock();
-      trans[0]=randf();
-      trans[2]=randf();  
-      randAngle[0] = randf();
-      randAngle[2] = randf();
-//     mtxRand.unlock();
-    
-    
-    trans[0] = trans[0]*max-max/2;
-    trans[2] = trans[2]*max-max/2;
-    randAngle[0] = randAngle[0]*1000-500;
-    randAngle[2] = randAngle[2]*1000-500;
-    
-    randAngle.normalize();
-    
-    for (k=0; k<vertices.size(); k++) {
+      trans[0] = dice.nextd() * max - max / 2;
+      trans[2] = dice.nextd() * max - max / 2;
+      randAngle[0] = dice.nextd() - 0.5;
+      randAngle[2] = dice.nextd() - 0.5;
+      randAngle.normalize();
+
+    for (k=from; k<to; k++) {
       tmp2 = trans + vertices[k];
       tmp2[1]=0;
       tmp2.normalize();
-      if (randAngle.angleTo(tmp2)>=90) { 
-        /*synchronizacja dla nakladania roznic wysokosciowych*/
-//         mtxGen.lock();
-        vertices[k][1]+=localMagnitude; 
-//         mtxGen.unlock();
-      } 
-        else { 
-        /*synchronizacja dla nakladania roznic wysokosciowych*/
-//           mtxGen.lock();
-          vertices[k][1]-=localMagnitude;
-//           mtxGen.unlock();
-        }
+      if ( randAngle.angleTo( tmp2 ) >= 90 ) {
+        vertices[k][1] += localMagnitude;
+      } else {
+        vertices[k][1] -= localMagnitude;
+      }
     }
     
   }

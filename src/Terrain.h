@@ -5,6 +5,8 @@
 #include "Face.h"
 #include "Texture.h"
 
+#include <cstdint>
+
 class Terrain {
 private:
   std::vector<Vertex> vertices;
@@ -16,6 +18,7 @@ private:
   double step;
   double magnitude;
   double size;
+  uint64_t m_seed;
   uint n;
   uint phases;
   Texture texture;
@@ -23,7 +26,7 @@ private:
   std::mutex mtxRand;
   std::mutex mtxGen;
   uint numOfThreads;
-  void genThreded();
+  void genThreded( uint64_t from, uint64_t to );
   
 public:
   Terrain();
@@ -37,7 +40,7 @@ public:
   Terrain& setDensity(const uint& i);
   Terrain& setThreads(const uint& i);
   
-  static int generateStatic(void* param);
+  static int generateStatic( void* param, uint64_t from, uint64_t to );
   
   
   Terrain& makeTexture();
