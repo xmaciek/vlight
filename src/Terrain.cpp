@@ -5,7 +5,7 @@
 Terrain::Terrain() {
   size = 400;
   setDensity(256);
-  numOfThreads = 1;
+  numOfThreads = std::thread::hardware_concurrency();
 }
 
 Terrain::~Terrain() {
