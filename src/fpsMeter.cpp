@@ -1,39 +1,48 @@
 #include "fpsMeter.h"
 
-fpsMeter::fpsMeter() {
-  timeTotal = framesDone = count = 0;
-  lastUpdate = 0;
-  highest = 0;
-  top = 0;
+fpsMeter::fpsMeter()
+: m_fps( 0 )
+, m_framesDone( 0 )
+{
 }
 
-fpsMeter& fpsMeter::beginFrame() {
-  timeStart = SDL_GetTicks();
-  return *this;
-}
-
-
-fpsMeter& fpsMeter::endFrame() {
-  framesDone++;
-  uint tmp = SDL_GetTicks() - timeStart;
-  timeTotal += tmp;
-  if (tmp>highest) { highest = tmp; }
-  return *this;
+void fpsMeter::beginFrame()
+{
+    m_currentFrameBegin = std::chrono::system_clock::now();
 }
 
 
+void fpsMeter::endFrame()
+{
+    m_framesDuration += std::chrono::system_clock::now() - m_currentFrameBegin;;
+    m_framesDone++;
+}
 
-fpsMeter& fpsMeter::update() {
-  uint x = SDL_GetTicks();
-  if (x-lastUpdate<1000) { return *this; }
-  lastUpdate = x;
-  count = framesDone;
-  framesDone = 0;
-  top = highest;
-  highest = 0;
-  average = (double)timeTotal/count;
-  FPS = 1000.0 / average;
-  timeTotal = 0;
-  return *this;
+double fpsMeter::averageFrame() const
+{
+    return (double)std::chrono::duration_cast<std::chrono::milliseconds>( m_totalDuration ).count() / ( m_fps ? m_fps : 1 );
+}
+
+std::uint64_t fpsMeter::fps() const
+{
+    return m_fps;
+}
+
+std::uint64_t fpsMeter::calcFps() const
+{
+    return 1000.0 / averageFrame();
+}
+
+void fpsMeter::update()
+{
+    const fpsMeter::TimePoint now = std::chrono::system_clock::now();
+    if  ( !std::chrono::duration_cast<std::chrono::seconds>( now - m_lastUpdate ).count() ) {
+        return;
+    }
+    m_lastUpdate = now;
+    m_fps = m_framesDone;
+    m_framesDone = 0;
+    m_totalDuration = m_framesDuration;
+    m_framesDuration = fpsMeter::Duration();
 }
 

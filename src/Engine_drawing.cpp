@@ -41,8 +41,8 @@ void Engine::drawPlayScreen() {
   /*hud info*/
   SHADER::pushMatrix();
     SHADER::setOrtho(0,WIDTH,0,HEIGHT);  
-    lblFps.setText("FPS: ")<<FPSCounter.count;
-    lblFps<<"; calc: "<<FPSCounter.FPS<<" ( "<<FPSCounter.average<<" ms/fm )";
+    lblFps.setText( "FPS: " ) << FPSCounter.fps();
+    lblFps << "; calc: " << FPSCounter.calcFps() << " ( " << FPSCounter.averageFrame() << " ms/fm )";
     lblFps.draw();
     lblSpeed.setText("Speed: ")<<plane.getSpeed();
     lblSpeed.draw();
