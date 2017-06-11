@@ -86,14 +86,18 @@ void Engine::cleanup() {
 }
 
 
-bool Engine::initNewSurface(const uint& W, const uint& H, bool F) {
-  WIDTH = W;
-  HEIGHT = H;
-  SDL_Surface *tmp = display, *tmp2 = NULL;
-  if (F) { tmp2 = SDL_SetVideoMode(W, H, 32, SDL_HWSURFACE | SDL_DOUBLEBUF | SDL_OPENGL | SDL_FULLSCREEN); }
-  else { tmp2 = SDL_SetVideoMode(W, H, 32, SDL_HWSURFACE | SDL_DOUBLEBUF | SDL_OPENGL | SDL_RESIZABLE); }
-  if (tmp2==NULL) { return false; }
-  display = tmp2;
-  if (tmp!=NULL) { SDL_FreeSurface(tmp); }
-  return true;
+bool Engine::initNewSurface( const uint& W, const uint& H, bool F )
+{
+    SDL_Surface* newSurface = SDL_SetVideoMode( W, H, 32, SDL_HWSURFACE | SDL_DOUBLEBUF | SDL_OPENGL | ( F ? SDL_FULLSCREEN : SDL_RESIZABLE ) );
+    if ( !newSurface ) {
+        return false;
+    }
+    WIDTH = W;
+    HEIGHT = H;
+    SDL_Surface* oldSurface = display;
+    display = newSurface;
+    if ( !oldSurface ) {
+        SDL_FreeSurface( oldSurface );
+    }
+    return true;
 }
